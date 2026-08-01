@@ -6,6 +6,7 @@
 <title>抵抗カラーコード学習</title>
 <style>
   :root {
+    color-scheme: light;
     --bg: #f4f2ee;
     --card: #ffffff;
     --text: #222;
@@ -16,8 +17,10 @@
     --border: #ddd;
     --tab-bg: #e6e2da;
   }
+  /* 自動: OS がダークなら適用(手動でライト指定時は除く) */
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
       --bg: #16181c;
       --card: #23262c;
       --text: #eceff1;
@@ -29,6 +32,19 @@
       --tab-bg: #2c3037;
     }
   }
+  /* 手動でダーク指定 */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #16181c;
+    --card: #23262c;
+    --text: #eceff1;
+    --sub: #9aa0a6;
+    --accent: #64b5f6;
+    --ok: #81c784;
+    --ng: #e57373;
+    --border: #3a3f47;
+    --tab-bg: #2c3037;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
@@ -37,8 +53,17 @@
     line-height: 1.6;
   }
   .app { max-width: 520px; margin: 0 auto; padding: 12px 12px 48px; }
-  h1 {
-    font-size: 1.15rem; text-align: center; padding: 8px 0 12px;
+  .header-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; position: relative; padding: 8px 0 12px;
+  }
+  h1 { font-size: 1.15rem; text-align: center; }
+  .theme-btn {
+    position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+    padding: 6px 10px; font-size: 0.72rem; font-weight: 600;
+    border: 1.5px solid var(--border); border-radius: 8px;
+    background: var(--card); color: var(--text); cursor: pointer; font-family: inherit;
+    white-space: nowrap;
   }
   /* タブ */
   .tabs {
@@ -146,7 +171,10 @@
 </head>
 <body>
 <div class="app">
-  <h1>🎨 抵抗カラーコード学習(4本帯)</h1>
+  <div class="header-row">
+    <h1>🎨 抵抗カラーコード学習(4本帯)</h1>
+    <button class="theme-btn" id="theme-btn" title="テーマ切替"></button>
+  </div>
   <nav class="tabs">
     <button data-tab="q1" class="active">色→値</button>
     <button data-tab="q2">値→色</button>
@@ -336,6 +364,35 @@ function resistorSVG(bands, opts = {}) {
     ${bandsSvg}
   </svg>`;
 }
+
+// ===== テーマ切替(自動 → ライト → ダーク の循環) =====
+const THEMES = [
+  { key: 'auto',  label: '🌓 自動' },
+  { key: 'light', label: '☀️ ライト' },
+  { key: 'dark',  label: '🌙 ダーク' },
+];
+let theme = 'auto';
+try {
+  const saved = localStorage.getItem('rc-theme');
+  if (saved === 'light' || saved === 'dark') theme = saved;
+} catch {}
+
+function applyTheme() {
+  if (theme === 'auto') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+  document.getElementById('theme-btn').textContent =
+    THEMES.find(t => t.key === theme).label;
+}
+document.getElementById('theme-btn').addEventListener('click', () => {
+  const i = THEMES.findIndex(t => t.key === theme);
+  theme = THEMES[(i + 1) % THEMES.length].key;
+  try { localStorage.setItem('rc-theme', theme); } catch {}
+  applyTheme();
+});
+applyTheme();
 
 // ===== タブ切替 =====
 document.querySelectorAll('.tabs button').forEach(btn => {
