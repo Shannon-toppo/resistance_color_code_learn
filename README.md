@@ -4,6 +4,8 @@
 
 **▶ 公開ページ: https://shannon-toppo.github.io/resistance_color_code_learn/**
 
+<img src="docs/screenshot.png" alt="色→値クイズの画面(1kΩ = 茶・黒・赤・金)" width="360">
+
 ## 機能
 
 - **クイズ: 色→値** — カラーバンドを見て抵抗値を入力して回答(単位は Ω / kΩ / MΩ から選択)
