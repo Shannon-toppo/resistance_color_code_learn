@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>抵抗カラーコード学習</title>
+<style>
+  :root {
+    --bg: #f4f2ee;
+    --card: #ffffff;
+    --text: #222;
+    --sub: #666;
+    --accent: #1976d2;
+    --ok: #2e7d32;
+    --ng: #c62828;
+    --border: #ddd;
+    --tab-bg: #e6e2da;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --card: #23262c;
+      --text: #eceff1;
+      --sub: #9aa0a6;
+      --accent: #64b5f6;
+      --ok: #81c784;
+      --ng: #e57373;
+      --border: #3a3f47;
+      --tab-bg: #2c3037;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .app { max-width: 520px; margin: 0 auto; padding: 12px 12px 48px; }
+  h1 {
+    font-size: 1.15rem; text-align: center; padding: 8px 0 12px;
+  }
+  /* タブ */
+  .tabs {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 14px;
+  }
+  .tabs button {
+    padding: 9px 2px; font-size: 0.8rem; border: none; border-radius: 8px;
+    background: var(--tab-bg); color: var(--text); cursor: pointer;
+    font-family: inherit;
+  }
+  .tabs button.active { background: var(--accent); color: #fff; font-weight: 600; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card {
+    background: var(--card); border-radius: 12px; padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 14px;
+  }
+  .sub { color: var(--sub); font-size: 0.82rem; }
+  /* 出題モード切替 */
+  .seg {
+    display: flex; gap: 0; border: 1.5px solid var(--border); border-radius: 9px;
+    overflow: hidden; margin-bottom: 10px;
+  }
+  .seg button {
+    flex: 1; padding: 8px 4px; font-size: 0.78rem; border: none;
+    background: var(--card); color: var(--sub); cursor: pointer; font-family: inherit;
+  }
+  .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+  /* 抵抗器SVG */
+  .resistor-wrap { display: flex; justify-content: center; padding: 8px 0; }
+  .resistor-wrap svg { width: 100%; max-width: 340px; height: auto; }
+  /* 数値入力 */
+  .answer-row { display: flex; gap: 8px; margin-top: 12px; justify-content: center; }
+  .answer-row input {
+    flex: 1; min-width: 0; max-width: 180px; padding: 11px 12px;
+    font-size: 1.15rem; font-weight: 600; text-align: right;
+    border: 1.5px solid var(--border); border-radius: 10px;
+    background: var(--card); color: var(--text); font-family: inherit;
+  }
+  .answer-row input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  .answer-row input.correct { border-color: var(--ok); outline: 2px solid var(--ok); }
+  .answer-row input.wrong { border-color: var(--ng); outline: 2px solid var(--ng); }
+  .answer-row select {
+    padding: 11px 10px; font-size: 1.05rem; font-weight: 600;
+    border: 1.5px solid var(--border); border-radius: 10px;
+    background: var(--card); color: var(--text); font-family: inherit; cursor: pointer;
+  }
+  .feedback { margin-top: 12px; font-size: 0.92rem; min-height: 1.4em; }
+  .feedback .big { font-weight: 700; font-size: 1.05rem; }
+  .btn {
+    display: inline-block; padding: 11px 22px; border: none; border-radius: 10px;
+    background: var(--accent); color: #fff; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn.secondary { background: var(--tab-bg); color: var(--text); }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; justify-content: center; }
+  .stats { display: flex; justify-content: space-around; text-align: center; }
+  .stats .num { font-size: 1.3rem; font-weight: 700; }
+  /* カラーパレット */
+  .palette { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin-top: 10px; }
+  .palette button {
+    height: 44px; border-radius: 9px; border: 2px solid var(--border);
+    cursor: pointer; font-size: 0.72rem; font-weight: 700; font-family: inherit;
+  }
+  .palette button.selected { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .target-value { text-align: center; font-size: 1.7rem; font-weight: 800; padding: 4px 0; }
+  .band-tabs { display: flex; gap: 6px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+  .band-tabs button {
+    padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: var(--card); color: var(--text); cursor: pointer; font-size: 0.8rem; font-family: inherit;
+  }
+  .band-tabs button.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+  /* 早見表 */
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 7px 5px; text-align: center; border-bottom: 1px solid var(--border); }
+  th { font-size: 0.75rem; color: var(--sub); font-weight: 600; }
+  .swatch {
+    display: inline-block; width: 22px; height: 22px; border-radius: 5px;
+    border: 1px solid rgba(0,0,0,0.25); vertical-align: middle;
+  }
+  .live-value { text-align: center; font-size: 1.5rem; font-weight: 800; margin-top: 6px; }
+  /* 語呂カード */
+  .goro-grid { display: grid; gap: 9px; }
+  .goro-card {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    border-radius: 11px; border: 1px solid var(--border); background: var(--card);
+    cursor: pointer; user-select: none; -webkit-user-select: none;
+  }
+  .goro-card .chip {
+    width: 46px; height: 46px; border-radius: 10px; flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; font-weight: 800;
+  }
+  .goro-card .txt { flex: 1; }
+  .goro-card .goro-text { font-size: 1rem; font-weight: 600; }
+  .goro-card .meta { font-size: 0.78rem; color: var(--sub); }
+  .goro-card .digit-badge {
+    font-size: 1.5rem; font-weight: 800; width: 40px; text-align: center;
+  }
+  .hidden-digit { filter: blur(7px); }
+  h2 { font-size: 0.95rem; margin-bottom: 8px; }
+  .center { text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🎨 抵抗カラーコード学習(4本帯)</h1>
+  <nav class="tabs">
+    <button data-tab="q1" class="active">色→値</button>
+    <button data-tab="q2">値→色</button>
+    <button data-tab="chart">早見表</button>
+    <button data-tab="goro">語呂</button>
+  </nav>
+
+  <!-- クイズ1: 色→値 -->
+  <section class="panel active" id="panel-q1">
+    <div class="card">
+      <div class="seg" data-seg>
+        <button data-mode="e12">E12系列(実在値)</button>
+        <button data-mode="rand">乱数(練習用)</button>
+      </div>
+      <div class="sub center">この抵抗の値は?</div>
+      <div class="resistor-wrap" id="q1-resistor"></div>
+      <div class="answer-row">
+        <input type="text" inputmode="decimal" id="q1-input" placeholder="数値" autocomplete="off">
+        <select id="q1-unit">
+          <option value="1">Ω</option>
+          <option value="1000">kΩ</option>
+          <option value="1000000">MΩ</option>
+        </select>
+      </div>
+      <div class="feedback" id="q1-feedback"></div>
+      <div class="btn-row" id="q1-submit-row">
+        <button class="btn" id="q1-submit">回答する</button>
+      </div>
+      <div class="btn-row" id="q1-next-row" style="display:none">
+        <button class="btn" id="q1-next">次の問題 →</button>
+      </div>
+    </div>
+    <div class="card stats">
+      <div><div class="num" id="q1-streak">0</div><div class="sub">連続正解</div></div>
+      <div><div class="num" id="q1-rate">—</div><div class="sub">正答率</div></div>
+      <div><div class="num" id="q1-total">0</div><div class="sub">回答数</div></div>
+    </div>
+  </section>
+
+  <!-- クイズ2: 値→色 -->
+  <section class="panel" id="panel-q2">
+    <div class="card">
+      <div class="seg" data-seg>
+        <button data-mode="e12">E12系列(実在値)</button>
+        <button data-mode="rand">乱数(練習用)</button>
+      </div>
+      <div class="sub center">この値になるようにバンドを塗ろう</div>
+      <div class="target-value" id="q2-target"></div>
+      <div class="resistor-wrap" id="q2-resistor"></div>
+      <div class="band-tabs" id="q2-band-tabs"></div>
+      <div class="palette" id="q2-palette"></div>
+      <div class="feedback" id="q2-feedback"></div>
+      <div class="btn-row">
+        <button class="btn" id="q2-check">判定する</button>
+        <button class="btn secondary" id="q2-next" style="display:none">次の問題 →</button>
+      </div>
+    </div>
+    <div class="card stats">
+      <div><div class="num" id="q2-streak">0</div><div class="sub">連続正解</div></div>
+      <div><div class="num" id="q2-rate">—</div><div class="sub">正答率</div></div>
+      <div><div class="num" id="q2-total">0</div><div class="sub">回答数</div></div>
+    </div>
+  </section>
+
+  <!-- 早見表 -->
+  <section class="panel" id="panel-chart">
+    <div class="card">
+      <h2>🔧 さわって学ぶ(バンドをタップで色が変わる)</h2>
+      <div class="resistor-wrap" id="chart-resistor"></div>
+      <div class="live-value" id="chart-value"></div>
+      <div class="sub center" id="chart-detail"></div>
+    </div>
+    <div class="card">
+      <h2>📋 カラーコード表</h2>
+      <table>
+        <thead><tr><th>色</th><th></th><th>数字</th><th>乗数</th><th>許容差</th></tr></thead>
+        <tbody id="chart-table"></tbody>
+      </table>
+      <p class="sub" style="margin-top:8px">4本帯の読み方: <b>1桁目・2桁目・乗数・許容差</b><br>例: 黄 紫 赤 金 → 47 ×10² = 4.7kΩ ±5%</p>
+    </div>
+  </section>
+
+  <!-- 語呂合わせ -->
+  <section class="panel" id="panel-goro">
+    <div class="card">
+      <h2>🧠 語呂合わせで暗記</h2>
+      <p class="sub" style="margin-bottom:10px">カードをタップすると数字を隠す/表示できます。隠して思い出す練習をしよう。</p>
+      <div class="btn-row" style="margin:0 0 12px">
+        <button class="btn secondary" id="goro-hide-all">全部隠す</button>
+        <button class="btn secondary" id="goro-show-all">全部表示</button>
+      </div>
+      <div class="goro-grid" id="goro-grid"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+'use strict';
+
+// ===== データ =====
+const COLORS = [
+  { name: '黒', en: 'black',  digit: 0, mult: 1,    tol: null,   color: '#1a1a1a', text: '#fff', goro: '黒い礼(0)服' },
+  { name: '茶', en: 'brown',  digit: 1, mult: 10,   tol: '±1%',  color: '#6b3e26', text: '#fff', goro: 'お茶を一(1)杯' },
+  { name: '赤', en: 'red',    digit: 2, mult: 100,  tol: '±2%',  color: '#d32f2f', text: '#fff', goro: '赤いに(2)んじん' },
+  { name: '橙', en: 'orange', digit: 3, mult: 1e3,  tol: null,   color: '#f57c00', text: '#fff', goro: '橙(だいだい)は第三(3)の色' },
+  { name: '黄', en: 'yellow', digit: 4, mult: 1e4,  tol: null,   color: '#fbc02d', text: '#333', goro: '黄色いし(4)んごう' },
+  { name: '緑', en: 'green',  digit: 5, mult: 1e5,  tol: null,   color: '#388e3c', text: '#fff', goro: '緑のご(5)はん' },
+  { name: '青', en: 'blue',   digit: 6, mult: 1e6,  tol: null,   color: '#1976d2', text: '#fff', goro: '青二才のろく(6)でなし' },
+  { name: '紫', en: 'violet', digit: 7, mult: 1e7,  tol: null,   color: '#7b1fa2', text: '#fff', goro: '紫式(7)部' },
+  { name: '灰', en: 'gray',   digit: 8, mult: 1e8,  tol: null,   color: '#9e9e9e', text: '#333', goro: 'ハイ(灰)ヤー(8)' },
+  { name: '白', en: 'white',  digit: 9, mult: 1e9,  tol: null,   color: '#fafafa', text: '#333', goro: '白いク(9)ジラ' },
+];
+const TOL_BANDS = [
+  { name: '金', en: 'gold',   tol: '±5%',  color: '#c9a227', text: '#333' },
+  { name: '銀', en: 'silver', tol: '±10%', color: '#b8b8b8', text: '#333' },
+];
+const E12 = [10, 12, 15, 18, 22, 27, 33, 39, 47, 56, 68, 82];
+
+// バンド表現: { d1, d2, mult, tol }  d1,d2 = 0-9 のインデックス, mult = 0-9, tol = 0(金) or 1(銀)
+function bandsToOhms(b) {
+  return (b.d1 * 10 + b.d2) * COLORS[b.mult].mult;
+}
+function formatOhms(v) {
+  if (v >= 1e6) return trimNum(v / 1e6) + 'MΩ';
+  if (v >= 1e3) return trimNum(v / 1e3) + 'kΩ';
+  return trimNum(v) + 'Ω';
+}
+function trimNum(n) {
+  return (Math.round(n * 100) / 100).toString();
+}
+// 乗数を10の冪乗表記にする(例: 5 → ×10⁵)
+const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+function powLabel(exp) {
+  return '×10' + SUP[exp];
+}
+function randInt(n) { return Math.floor(Math.random() * n); }
+
+// 出題モード: 'e12' = 実在値のみ / 'rand' = 完全乱数(練習用)
+let genMode = 'e12';
+try { genMode = localStorage.getItem('rc-genmode') === 'rand' ? 'rand' : 'e12'; } catch {}
+
+// ランダムなバンドを生成 (10Ω 〜 9.9MΩ)
+function randomBands() {
+  let sig;
+  if (genMode === 'rand') {
+    sig = 10 + randInt(90);                   // 10-99 の任意の2桁
+  } else {
+    sig = E12[randInt(E12.length)];           // E12系列 10-82
+  }
+  const mult = randInt(6);                    // ×10⁰ 〜 ×10⁵
+  return { d1: Math.floor(sig / 10), d2: sig % 10, mult, tol: randInt(2) };
+}
+
+// ===== 抵抗器SVG描画 =====
+// bands: {d1,d2,mult,tol} それぞれ null なら無地。interactive なら data-band 属性を付ける
+function resistorSVG(bands, opts = {}) {
+  const bodyFill = '#e8d5b0';
+  const bodyStroke = '#b09b73';
+  const bandX = [88, 122, 156, 208];
+  const colors = [
+    bands.d1 != null ? COLORS[bands.d1].color : null,
+    bands.d2 != null ? COLORS[bands.d2].color : null,
+    bands.mult != null ? COLORS[bands.mult].color : null,
+    bands.tol != null ? TOL_BANDS[bands.tol].color : null,
+  ];
+  let bandsSvg = '';
+  colors.forEach((c, i) => {
+    const fill = c || 'rgba(0,0,0,0.06)';
+    const dash = c ? '' : 'stroke-dasharray="4 3"';
+    const cursor = opts.interactive ? 'style="cursor:pointer"' : '';
+    const hl = opts.highlight === i ? `<rect x="${bandX[i] - 5}" y="26" width="24" height="68" rx="6" fill="none" stroke="var(--accent)" stroke-width="3"/>` : '';
+    bandsSvg += `
+      <g ${opts.interactive ? `data-band="${i}"` : ''} ${cursor}>
+        <rect x="${bandX[i]}" y="32" width="14" height="56" rx="2"
+          fill="${fill}" stroke="${c ? 'rgba(0,0,0,0.3)' : '#999'}" stroke-width="1" ${dash}/>
+        ${hl}
+        ${opts.interactive ? `<rect x="${bandX[i] - 8}" y="20" width="30" height="80" fill="transparent"/>` : ''}
+      </g>`;
+  });
+  return `
+  <svg viewBox="0 0 340 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="抵抗器">
+    <line x1="0" y1="60" x2="60" y2="60" stroke="#8a9199" stroke-width="5" stroke-linecap="round"/>
+    <line x1="280" y1="60" x2="340" y2="60" stroke="#8a9199" stroke-width="5" stroke-linecap="round"/>
+    <rect x="58" y="30" width="224" height="60" rx="28" fill="${bodyFill}" stroke="${bodyStroke}" stroke-width="2"/>
+    <ellipse cx="86" cy="60" rx="28" ry="32" fill="${bodyFill}" stroke="${bodyStroke}" stroke-width="2"/>
+    <ellipse cx="254" cy="60" rx="28" ry="32" fill="${bodyFill}" stroke="${bodyStroke}" stroke-width="2"/>
+    ${bandsSvg}
+  </svg>`;
+}
+
+// ===== タブ切替 =====
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ===== スコア管理 =====
+function loadScore(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || { streak: 0, correct: 0, total: 0 }; }
+  catch { return { streak: 0, correct: 0, total: 0 }; }
+}
+function saveScore(key, s) {
+  try { localStorage.setItem(key, JSON.stringify(s)); } catch {}
+}
+function renderScore(prefix, s) {
+  document.getElementById(prefix + '-streak').textContent = s.streak;
+  document.getElementById(prefix + '-total').textContent = s.total;
+  document.getElementById(prefix + '-rate').textContent =
+    s.total ? Math.round(s.correct / s.total * 100) + '%' : '—';
+}
+
+// ===== クイズ1: 色→値 =====
+const q1 = { bands: null, score: loadScore('rc-q1') };
+renderScore('q1', q1.score);
+
+function q1New() {
+  q1.bands = randomBands();
+  document.getElementById('q1-resistor').innerHTML = resistorSVG(q1.bands);
+  const input = document.getElementById('q1-input');
+  input.value = '';
+  input.disabled = false;
+  input.classList.remove('correct', 'wrong');
+  document.getElementById('q1-unit').disabled = false;
+  document.getElementById('q1-feedback').innerHTML = '';
+  document.getElementById('q1-submit-row').style.display = 'flex';
+  document.getElementById('q1-next-row').style.display = 'none';
+  input.focus();
+}
+
+function q1Answer() {
+  const input = document.getElementById('q1-input');
+  const unitSel = document.getElementById('q1-unit');
+  const num = parseFloat(input.value);
+  if (input.value.trim() === '' || !isFinite(num)) {
+    document.getElementById('q1-feedback').innerHTML =
+      `<span style="color:var(--ng)">数値を入力してください</span>`;
+    return;
+  }
+  const answer = bandsToOhms(q1.bands);
+  const picked = num * Number(unitSel.value);
+  // 浮動小数点の誤差を吸収して比較(例: 4.7 × 1000)
+  const ok = Math.abs(picked - answer) <= answer * 1e-9;
+  input.disabled = true;
+  unitSel.disabled = true;
+  input.classList.add(ok ? 'correct' : 'wrong');
+  const b = q1.bands;
+  const c1 = COLORS[b.d1], c2 = COLORS[b.d2], cm = COLORS[b.mult], ct = TOL_BANDS[b.tol];
+  const multLabel = powLabel(b.mult);
+  document.getElementById('q1-feedback').innerHTML =
+    `<div class="big" style="color:var(--${ok ? 'ok' : 'ng'})">${ok ? '⭕ 正解!' : '❌ 不正解…'}</div>` +
+    `${c1.name}=${c1.digit}, ${c2.name}=${c2.digit}, ${cm.name}=${multLabel} → ` +
+    `<b>${formatOhms(answer)}</b>(${ct.name}=${ct.tol})`;
+  q1.score.total++;
+  if (ok) { q1.score.correct++; q1.score.streak++; } else { q1.score.streak = 0; }
+  saveScore('rc-q1', q1.score);
+  renderScore('q1', q1.score);
+  document.getElementById('q1-submit-row').style.display = 'none';
+  document.getElementById('q1-next-row').style.display = 'flex';
+}
+document.getElementById('q1-submit').addEventListener('click', q1Answer);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (!document.getElementById('panel-q1').classList.contains('active')) return;
+  if (document.getElementById('q1-next-row').style.display !== 'none') q1New();
+  else q1Answer();
+});
+document.getElementById('q1-next').addEventListener('click', q1New);
+q1New();
+
+// ===== クイズ2: 値→色 =====
+const q2 = {
+  answer: null,          // 正解バンド
+  user: { d1: null, d2: null, mult: null, tol: null },
+  activeBand: 0,
+  score: loadScore('rc-q2'),
+  done: false,
+};
+renderScore('q2', q2.score);
+const BAND_KEYS = ['d1', 'd2', 'mult', 'tol'];
+const BAND_LABELS = ['1桁目', '2桁目', '乗数', '許容差'];
+
+function q2New() {
+  q2.answer = randomBands();
+  q2.user = { d1: null, d2: null, mult: null, tol: null };
+  q2.activeBand = 0;
+  q2.done = false;
+  document.getElementById('q2-target').textContent =
+    formatOhms(bandsToOhms(q2.answer)) + ' ' + TOL_BANDS[q2.answer.tol].tol;
+  document.getElementById('q2-feedback').innerHTML = '';
+  document.getElementById('q2-check').style.display = '';
+  document.getElementById('q2-next').style.display = 'none';
+  q2Render();
+}
+
+function q2Render() {
+  const wrap = document.getElementById('q2-resistor');
+  wrap.innerHTML = resistorSVG(q2.user, { interactive: !q2.done, highlight: q2.done ? -1 : q2.activeBand });
+  if (!q2.done) {
+    wrap.querySelectorAll('[data-band]').forEach(g => {
+      g.addEventListener('click', () => { q2.activeBand = +g.dataset.band; q2Render(); });
+    });
+  }
+  // バンド選択タブ
+  const tabs = document.getElementById('q2-band-tabs');
+  tabs.innerHTML = '';
+  BAND_LABELS.forEach((label, i) => {
+    const b = document.createElement('button');
+    const key = BAND_KEYS[i];
+    const val = q2.user[key];
+    const set = val != null ? (i === 3 ? TOL_BANDS[val].name : COLORS[val].name) : '?';
+    b.textContent = `${label}: ${set}`;
+    if (i === q2.activeBand && !q2.done) b.classList.add('active');
+    b.addEventListener('click', () => { if (!q2.done) { q2.activeBand = i; q2Render(); } });
+    tabs.appendChild(b);
+  });
+  // パレット
+  const pal = document.getElementById('q2-palette');
+  pal.innerHTML = '';
+  const list = q2.activeBand === 3 ? TOL_BANDS : COLORS;
+  list.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.style.background = c.color;
+    b.style.color = c.text;
+    b.textContent = c.name;
+    const key = BAND_KEYS[q2.activeBand];
+    if (q2.user[key] === i) b.classList.add('selected');
+    b.disabled = q2.done;
+    b.addEventListener('click', () => {
+      q2.user[key] = i;
+      if (q2.activeBand < 3) q2.activeBand++;   // 次のバンドへ自動移動
+      q2Render();
+    });
+    pal.appendChild(b);
+  });
+}
+
+document.getElementById('q2-check').addEventListener('click', () => {
+  const u = q2.user;
+  if (u.d1 == null || u.d2 == null || u.mult == null || u.tol == null) {
+    document.getElementById('q2-feedback').innerHTML =
+      `<span style="color:var(--ng)">まだ塗っていないバンドがあります</span>`;
+    return;
+  }
+  const a = q2.answer;
+  // 値と許容差が一致していれば正解(例: 47×10 と同値の別表現は E12+2桁固定なので実質一意)
+  const ok = bandsToOhms(u) === bandsToOhms(a) && u.tol === a.tol;
+  const names = `${COLORS[a.d1].name}・${COLORS[a.d2].name}・${COLORS[a.mult].name}・${TOL_BANDS[a.tol].name}`;
+  document.getElementById('q2-feedback').innerHTML =
+    `<div class="big" style="color:var(--${ok ? 'ok' : 'ng'})">${ok ? '⭕ 正解!' : '❌ 不正解…'}</div>` +
+    `正解: <b>${names}</b>(${COLORS[a.d1].digit}${COLORS[a.d2].digit} ${powLabel(a.mult)} = ${formatOhms(bandsToOhms(a))})`;
+  if (!ok) { q2.user = { ...a }; } // 正解の配色を見せる
+  q2.done = true;
+  q2.score.total++;
+  if (ok) { q2.score.correct++; q2.score.streak++; } else { q2.score.streak = 0; }
+  saveScore('rc-q2', q2.score);
+  renderScore('q2', q2.score);
+  document.getElementById('q2-check').style.display = 'none';
+  document.getElementById('q2-next').style.display = '';
+  q2Render();
+});
+document.getElementById('q2-next').addEventListener('click', q2New);
+q2New();
+
+// ===== 出題モード切替(両クイズ共通) =====
+function renderSegs() {
+  document.querySelectorAll('[data-seg] button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === genMode);
+  });
+}
+document.querySelectorAll('[data-seg] button').forEach(b => {
+  b.addEventListener('click', () => {
+    if (b.dataset.mode === genMode) return;
+    genMode = b.dataset.mode;
+    try { localStorage.setItem('rc-genmode', genMode); } catch {}
+    renderSegs();
+    q1New();   // 新しいモードで出題し直す
+    q2New();
+  });
+});
+renderSegs();
+
+// ===== 早見表 =====
+const chart = { bands: { d1: 4, d2: 7, mult: 2, tol: 0 } }; // 4.7kΩ ±5%
+function chartRender() {
+  const wrap = document.getElementById('chart-resistor');
+  wrap.innerHTML = resistorSVG(chart.bands, { interactive: true });
+  wrap.querySelectorAll('[data-band]').forEach(g => {
+    g.addEventListener('click', () => {
+      const i = +g.dataset.band;
+      const key = BAND_KEYS[i];
+      const len = i === 3 ? TOL_BANDS.length : COLORS.length;
+      chart.bands[key] = (chart.bands[key] + 1) % len;
+      chartRender();
+    });
+  });
+  const b = chart.bands;
+  document.getElementById('chart-value').textContent =
+    formatOhms(bandsToOhms(b)) + ' ' + TOL_BANDS[b.tol].tol;
+  document.getElementById('chart-detail').textContent =
+    `${COLORS[b.d1].name}(${COLORS[b.d1].digit}) ${COLORS[b.d2].name}(${COLORS[b.d2].digit}) ` +
+    `${COLORS[b.mult].name}(${powLabel(b.mult)}) ${TOL_BANDS[b.tol].name}(${TOL_BANDS[b.tol].tol})`;
+}
+chartRender();
+
+const tbody = document.getElementById('chart-table');
+COLORS.forEach(c => {
+  const tr = document.createElement('tr');
+  tr.innerHTML =
+    `<td>${c.name}</td>` +
+    `<td><span class="swatch" style="background:${c.color}"></span></td>` +
+    `<td><b>${c.digit}</b></td>` +
+    `<td>${powLabel(c.digit)}</td>` +
+    `<td>${c.tol || '—'}</td>`;
+  tbody.appendChild(tr);
+});
+TOL_BANDS.forEach(c => {
+  const tr = document.createElement('tr');
+  tr.innerHTML =
+    `<td>${c.name}</td>` +
+    `<td><span class="swatch" style="background:${c.color}"></span></td>` +
+    `<td>—</td><td>—</td><td><b>${c.tol}</b></td>`;
+  tbody.appendChild(tr);
+});
+
+// ===== 語呂合わせ =====
+const goroGrid = document.getElementById('goro-grid');
+COLORS.forEach(c => {
+  const card = document.createElement('div');
+  card.className = 'goro-card';
+  card.innerHTML =
+    `<div class="chip" style="background:${c.color};color:${c.text}">${c.name}</div>` +
+    `<div class="txt"><div class="goro-text">${c.goro}</div>` +
+    `<div class="meta">${c.en} / 乗数 ${powLabel(c.digit)}${c.tol ? ' / ' + c.tol : ''}</div></div>` +
+    `<div class="digit-badge">${c.digit}</div>`;
+  card.addEventListener('click', () => {
+    card.querySelector('.digit-badge').classList.toggle('hidden-digit');
+  });
+  goroGrid.appendChild(card);
+});
+document.getElementById('goro-hide-all').addEventListener('click', () => {
+  document.querySelectorAll('.digit-badge').forEach(d => d.classList.add('hidden-digit'));
+});
+document.getElementById('goro-show-all').addEventListener('click', () => {
+  document.querySelectorAll('.digit-badge').forEach(d => d.classList.remove('hidden-digit'));
+});
+</script>
+</body>
+</html>
