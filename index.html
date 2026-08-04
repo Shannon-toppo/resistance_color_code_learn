@@ -113,11 +113,18 @@
   .answer-row input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
   .answer-row input.correct { border-color: var(--ok); outline: 2px solid var(--ok); }
   .answer-row input.wrong { border-color: var(--ng); outline: 2px solid var(--ng); }
-  .answer-row select {
-    padding: 11px 10px; font-size: 1.05rem; font-weight: 600;
-    border: 1.5px solid var(--border); border-radius: 10px;
-    background: var(--card); color: var(--text); font-family: inherit; cursor: pointer;
+  /* 単位切替(1タップで選べるセグメント) */
+  .unit-seg {
+    display: flex; flex-shrink: 0;
+    border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden;
   }
+  .unit-seg button {
+    padding: 11px 13px; font-size: 1rem; font-weight: 600; border: none;
+    background: var(--card); color: var(--sub); cursor: pointer; font-family: inherit;
+  }
+  .unit-seg button + button { border-left: 1.5px solid var(--border); }
+  .unit-seg button.active { background: var(--accent); color: #fff; }
+  .unit-seg button:disabled { cursor: default; opacity: 0.55; }
   .feedback { margin-top: 12px; font-size: 0.92rem; min-height: 1.4em; }
   .feedback .big { font-weight: 700; font-size: 1.05rem; }
   .btn {
@@ -200,11 +207,11 @@
       <div class="resistor-wrap" id="q1-resistor"></div>
       <div class="answer-row">
         <input type="text" inputmode="decimal" id="q1-input" placeholder="数値" autocomplete="off">
-        <select id="q1-unit">
-          <option value="1">Ω</option>
-          <option value="1000">kΩ</option>
-          <option value="1000000">MΩ</option>
-        </select>
+        <div class="unit-seg" id="q1-unit" role="group" aria-label="単位">
+          <button type="button" data-mult="1">Ω</button>
+          <button type="button" data-mult="1000">kΩ</button>
+          <button type="button" data-mult="1000000">MΩ</button>
+        </div>
       </div>
       <div class="feedback" id="q1-feedback"></div>
       <div class="btn-row" id="q1-submit-row">
@@ -441,8 +448,22 @@ function renderScore(prefix, s) {
 }
 
 // ===== クイズ1: 色→値 =====
-const q1 = { bands: null, score: loadScore('rc-q1') };
+const q1 = { bands: null, score: loadScore('rc-q1'), unit: 1 };
 renderScore('q1', q1.score);
+
+// 単位セグメント: 1タップで Ω / kΩ / MΩ を切り替える(選択は次の問題にも引き継ぐ)
+const unitBtns = [...document.querySelectorAll('#q1-unit button')];
+function q1RenderUnit() {
+  unitBtns.forEach(b => b.classList.toggle('active', Number(b.dataset.mult) === q1.unit));
+}
+unitBtns.forEach(b => {
+  b.addEventListener('click', () => {
+    q1.unit = Number(b.dataset.mult);
+    q1RenderUnit();
+    document.getElementById('q1-input').focus();
+  });
+});
+q1RenderUnit();
 
 function q1New() {
   q1.bands = randomBands();
@@ -451,7 +472,7 @@ function q1New() {
   input.value = '';
   input.disabled = false;
   input.classList.remove('correct', 'wrong');
-  document.getElementById('q1-unit').disabled = false;
+  unitBtns.forEach(b => b.disabled = false);
   document.getElementById('q1-feedback').innerHTML = '';
   document.getElementById('q1-submit-row').style.display = 'flex';
   document.getElementById('q1-next-row').style.display = 'none';
@@ -460,7 +481,6 @@ function q1New() {
 
 function q1Answer() {
   const input = document.getElementById('q1-input');
-  const unitSel = document.getElementById('q1-unit');
   const num = parseFloat(input.value);
   if (input.value.trim() === '' || !isFinite(num)) {
     document.getElementById('q1-feedback').innerHTML =
@@ -468,11 +488,11 @@ function q1Answer() {
     return;
   }
   const answer = bandsToOhms(q1.bands);
-  const picked = num * Number(unitSel.value);
+  const picked = num * q1.unit;
   // 浮動小数点の誤差を吸収して比較(例: 4.7 × 1000)
   const ok = Math.abs(picked - answer) <= answer * 1e-9;
   input.disabled = true;
-  unitSel.disabled = true;
+  unitBtns.forEach(b => b.disabled = true);
   input.classList.add(ok ? 'correct' : 'wrong');
   const b = q1.bands;
   const c1 = COLORS[b.d1], c2 = COLORS[b.d2], cm = COLORS[b.mult], ct = TOL_BANDS[b.tol];
