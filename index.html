@@ -92,6 +92,13 @@
     background: var(--card); color: var(--sub); cursor: pointer; font-family: inherit;
   }
   .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+  /* オプション行(チェックボックス) */
+  .opt-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    font-size: 0.8rem; color: var(--sub); cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+  }
+  .opt-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
   /* 抵抗器SVG */
   .resistor-wrap { display: flex; justify-content: center; padding: 8px 0; }
   .resistor-wrap svg { width: 100%; max-width: 340px; height: auto; }
@@ -221,6 +228,10 @@
         <button data-mode="e12">E12系列(実在値)</button>
         <button data-mode="rand">乱数(練習用)</button>
       </div>
+      <label class="opt-row">
+        <input type="checkbox" id="q2-shuffle">
+        <span>色パレットの並び順をランダムにする</span>
+      </label>
       <div class="sub center">この値になるようにバンドを塗ろう</div>
       <div class="target-value" id="q2-target"></div>
       <div class="resistor-wrap" id="q2-resistor"></div>
@@ -311,6 +322,16 @@ function powLabel(exp) {
   return '×10' + SUP[exp];
 }
 function randInt(n) { return Math.floor(Math.random() * n); }
+// 0..n-1 の並び(shuffle=true ならフィッシャー・イェーツでシャッフル)
+function orderOf(n, shuffle) {
+  const a = Array.from({ length: n }, (_, i) => i);
+  if (!shuffle) return a;
+  for (let i = n - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 // 出題モード: 'e12' = 実在値のみ / 'rand' = 完全乱数(練習用)
 let genMode = 'e12';
@@ -484,13 +505,31 @@ const q2 = {
   activeBand: 0,
   score: loadScore('rc-q2'),
   done: false,
+  order: { colors: null, tol: null },   // パレットの表示順(インデックスの配列)
 };
 renderScore('q2', q2.score);
 const BAND_KEYS = ['d1', 'd2', 'mult', 'tol'];
 const BAND_LABELS = ['1桁目', '2桁目', '乗数', '許容差'];
 
+// パレットの並び順をランダムにするか(問題ごとにシャッフルし直す)
+let paletteShuffle = false;
+try { paletteShuffle = localStorage.getItem('rc-q2-shuffle') === '1'; } catch {}
+function q2Shuffle() {
+  q2.order.colors = orderOf(COLORS.length, paletteShuffle);
+  q2.order.tol = orderOf(TOL_BANDS.length, paletteShuffle);
+}
+const shuffleBox = document.getElementById('q2-shuffle');
+shuffleBox.checked = paletteShuffle;
+shuffleBox.addEventListener('change', () => {
+  paletteShuffle = shuffleBox.checked;
+  try { localStorage.setItem('rc-q2-shuffle', paletteShuffle ? '1' : '0'); } catch {}
+  q2Shuffle();     // 出題中の問題はそのまま、並びだけ切り替える
+  q2Render();
+});
+
 function q2New() {
   q2.answer = randomBands();
+  q2Shuffle();
   q2.user = { d1: null, d2: null, mult: null, tol: null };
   q2.activeBand = 0;
   q2.done = false;
@@ -527,7 +566,9 @@ function q2Render() {
   const pal = document.getElementById('q2-palette');
   pal.innerHTML = '';
   const list = q2.activeBand === 3 ? TOL_BANDS : COLORS;
-  list.forEach((c, i) => {
+  const order = q2.activeBand === 3 ? q2.order.tol : q2.order.colors;
+  order.forEach(i => {
+    const c = list[i];
     const b = document.createElement('button');
     b.style.background = c.color;
     b.style.color = c.text;
